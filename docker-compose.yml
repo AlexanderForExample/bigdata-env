@@ -1,0 +1,131 @@
+version: "3.8"
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - "9870:9870"
+      - "8020:8020"
+    environment:
+      - CLUSTER_NAME=test
+      - HDFS_CONF_dfs_namenode_name_dir=file:///hadoop/dfs/name
+      - ENSURE_NAMENODE_DIR=true
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    env_file:
+      - ./hive-metastore/conf/hadoop.env
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    ports:
+      - "9864:9864"
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    env_file:
+      - ./hive-metastore/conf/hadoop.env
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    environment:
+      SERVICE_PRECONDITION: "namenode:8020 datanode:9864"
+    ports:
+      - "8088:8088"
+    env_file:
+      - ./hive-metastore/conf/hadoop.env
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    environment:
+      SERVICE_PRECONDITION: "namenode:8020 datanode:9864 resourcemanager:8088"
+    ports:
+      - "8042:8042"
+    env_file:
+      - ./hive-metastore/conf/hadoop.env
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:8020 namenode:9870 datanode:9864 resourcemanager:8088"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hive-metastore/conf/hadoop.env
+
+  hive-server:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-server
+    env_file:
+      - ./hive-metastore/conf/hadoop-hive.env
+    environment:
+      HIVE_CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore/metastore"
+      SERVICE_PRECONDITION: "namenode:8020 datanode:9864 hive-metastore:9083"
+    ports:
+      - "10000:10000"
+
+  hive-metastore-postgresql:
+    image: bde2020/hive-metastore-postgresql:2.3.0
+    container_name: hive-metastore-postgresql
+
+  hive-metastore:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-metastore
+    env_file:
+      - ./hive-metastore/conf/hadoop-hive.env
+    command: /opt/hive/bin/hive --service metastore
+    environment:
+      SERVICE_PRECONDITION: "namenode:8020 datanode:9864 hive-metastore-postgresql:5432"
+    ports:
+      - "9083:9083"
+
+  spark-master:
+    build: ./spark-client
+    container_name: spark-master
+    environment:
+      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
+      - INIT_DAEMON_STEP=setup_spark
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+      - "4040:4040"
+      - "8888:8888"
+    volumes:
+      - ./spark-client/apps:/opt/spark-apps
+      - ./drivers:/opt/drivers
+
+volumes:
+  postgres-data:
+  mysql-data:
+  hadoop_namenode:
+  hadoop_historyserver:
+  hadoop_datanode:

@@ -1,0 +1,7 @@
+<!-- yarn-site.xml -->
+<configuration>
+  <property>
+    <name>yarn.resourcemanager.hostname</name>
+    <value>resourcemanager</value>
+  </property>
+</configuration>

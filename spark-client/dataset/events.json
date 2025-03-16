@@ -1,0 +1,4 @@
+{"event_id": "evt_001", "user_id": 456, "type": "login", "details": {"devices": ["web", "mobile"], "location": {"country": "RU", "city": "Moscow"}}}
+{"event_id": "evt_002", "user_id": 456, "type": "purchase", "details": {"products": [{"id": 1001, "category": "electronics", "price": 299}, {"id": 1005, "category": "accessories", "price": 15.5}]}}
+{"event_id": "evt_003", "user_id": 789, "type": "support_request", "details": {"issues": [{"type": "billing", "priority": "high"}]}}
+{"event_id": "evt_004", "user_id": 101, "type": "logout", "details": null}
