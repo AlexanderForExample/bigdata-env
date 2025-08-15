@@ -2,13 +2,13 @@ version: "3.8"
 services:
   x-airflow-common:
     &airflow-common
-    # In order to add custom dependencies or upgrade provider packages you can use your extended image.
-    # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
-    # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
     image: custom-airflow
-    # build: .
     environment:
       &airflow-common-env
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
@@ -17,18 +17,9 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-      # yamllint disable rule:line-length
-      # Use simple http server on scheduler for health checks
-      # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
-      # yamllint enable rule:line-length
       AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-      # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
-      # for other purpose (development, test and especially production usage) build/extend Airflow image.
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-      # The following line can be used to set a custom config file, stored in the local config folder
-      # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
-      # AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}/airflow/dags:/opt/airflow/dags
       - ${AIRFLOW_PROJ_DIR:-.}/airflow/logs:/opt/airflow/logs
@@ -39,8 +30,6 @@ services:
     user: "${AIRFLOW_UID:-50000}:0"
     depends_on:
       &airflow-common-depends-on
-      # redis:
-      #   condition: service_healthy
       postgres:
         condition: service_healthy
   postgres:
@@ -127,64 +116,16 @@ services:
     command:
       - -c
       - |
-        function ver() {
-          printf "%04d%04d%04d%04d" $${1//./ }
-        }
+        function ver() { printf "%04d%04d%04d%04d" $${1//./ }; }
         airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO && gosu airflow airflow version)
-        airflow_version_comparable=$$(ver $${airflow_version})
         min_airflow_version=2.8.4
-        min_airflow_version_comparable=$$(ver $${min_airflow_version})
-        if (( airflow_version_comparable < min_airflow_version_comparable )); then
-          echo
-          echo -e "\033[1;31mERROR!!!: Too old Airflow version $${airflow_version}!\e[0m"
-          echo "The minimum Airflow version supported: $${min_airflow_version}. Only use this or higher!"
-          echo
-          exit 1
-        fi
-        if [[ -z "${AIRFLOW_UID}" ]]; then
-          echo
-          echo -e "\033[1;33mWARNING!!!: AIRFLOW_UID not set!\e[0m"
-          echo "If you are on Linux, you SHOULD follow the instructions below to set "
-          echo "AIRFLOW_UID environment variable, otherwise files will be owned by root."
-          echo "For other operating systems you can get rid of the warning with manually created .env file:"
-          echo "    See: https://airflow.apache.org/docs/apache-airflow/stable/start/docker.html#setting-the-right-airflow-user"
-          echo
-        fi
-        one_meg=1048576
-        mem_available=$$(($$(getconf _PHYS_PAGES) * $$(getconf PAGE_SIZE) / one_meg))
-        cpus_available=$$(grep -cE 'cpu[0-9]+' /proc/stat)
-        disk_available=$$(df / | tail -1 | awk '{print $$4}')
-        warning_resources="false"
-        if (( mem_available < 4000 )) ; then
-          echo
-          echo -e "\033[1;33mWARNING!!!: Not enough memory available for Docker.\e[0m"
-          echo "At least 4GB of memory required. You have $$(numfmt --to iec $$((mem_available * one_meg)))"
-          echo
-          warning_resources="true"
-        fi
-        if (( cpus_available < 2 )); then
-          echo
-          echo -e "\033[1;33mWARNING!!!: Not enough CPUS available for Docker.\e[0m"
-          echo "At least 2 CPUs recommended. You have $${cpus_available}"
-          echo
-          warning_resources="true"
-        fi
-        if (( disk_available < one_meg * 10 )); then
-          echo
-          echo -e "\033[1;33mWARNING!!!: Not enough Disk space available for Docker.\e[0m"
-          echo "At least 10 GBs recommended. You have $$(numfmt --to iec $$((disk_available * 1024 )))"
-          echo
-          warning_resources="true"
-        fi
-        if [[ $${warning_resources} == "true" ]]; then
-          echo
-          echo -e "\033[1;33mWARNING!!!: You have not enough resources to run Airflow (see above)!\e[0m"
-          echo "Please follow the instructions to increase amount of resources available:"
-          echo "   https://airflow.apache.org/docs/apache-airflow/stable/start/docker.html#before-you-begin"
-          echo
-        fi
-        mkdir -p /sources/logs /sources/dags /sources/plugins
-        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        if (( $$(ver $$airflow_version) < $$(ver $$min_airflow_version) )); then
+          echo "Airflow $$airflow_version < $$min_airflow_version"; exit 1; fi
+        echo "DAGS: $$AIRFLOW__CORE__DAGS_FOLDER"
+        echo "PLUGINS: $$AIRFLOW__CORE__PLUGINS_FOLDER"
+        echo "LOGS: $$AIRFLOW__LOGGING__BASE_LOG_FOLDER"
+        mkdir -p "$$AIRFLOW__CORE__DAGS_FOLDER" "$$AIRFLOW__CORE__PLUGINS_FOLDER" "$$AIRFLOW__LOGGING__BASE_LOG_FOLDER"
+        chown -R "${AIRFLOW_UID:-50000}:0" "$$AIRFLOW__CORE__DAGS_FOLDER" "$$AIRFLOW__CORE__PLUGINS_FOLDER" "$$AIRFLOW__LOGGING__BASE_LOG_FOLDER"
         exec /entrypoint airflow version
 
     environment:
@@ -195,8 +136,12 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
+#    volumes:
+#      - .:/sources
     volumes:
-      - .:/sources
+      - ${AIRFLOW_PROJ_DIR:-.}/airflow/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/airflow/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/airflow/plugins:/opt/airflow/plugins
 
   airflow-cli:
     <<: *airflow-common
@@ -244,7 +189,19 @@ services:
     environment:
       - CLUSTER_NAME=test
       - HDFS_CONF_dfs_namenode_name_dir=file:///hadoop/dfs/name
+      - PYSPARK_PYTHON=/opt/conda/bin/python
       - ENSURE_NAMENODE_DIR=true
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/m.sh
+          bash /tmp/m.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
     env_file:
@@ -252,7 +209,19 @@ services:
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     environment:
-      SERVICE_PRECONDITION: "namenode:9870"
+      - SERVICE_PRECONDITION=namenode:9870
+      - PYSPARK_PYTHON=/opt/conda/bin/python
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/m.sh
+          bash /tmp/m.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
     ports:
       - "9864:9864"
     volumes:
@@ -263,7 +232,19 @@ services:
     image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
     container_name: resourcemanager
     environment:
-      SERVICE_PRECONDITION: "namenode:8020 datanode:9864"
+      - SERVICE_PRECONDITION=namenode:8020 datanode:9864
+      - PYSPARK_PYTHON=/opt/conda/bin/python
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/m.sh
+          bash /tmp/m.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
     ports:
       - "8088:8088"
     env_file:
@@ -272,7 +253,19 @@ services:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
     container_name: nodemanager
     environment:
-      SERVICE_PRECONDITION: "namenode:8020 datanode:9864 resourcemanager:8088"
+      - SERVICE_PRECONDITION=namenode:8020 datanode:9864 resourcemanager:8088
+      - PYSPARK_PYTHON=/opt/conda/bin/python
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/m.sh
+          bash /tmp/m.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
     ports:
       - "8042:8042"
     env_file:
@@ -283,7 +276,19 @@ services:
     container_name: historyserver
     restart: always
     environment:
-      SERVICE_PRECONDITION: "namenode:8020 namenode:9870 datanode:9864 resourcemanager:8088"
+      - SERVICE_PRECONDITION=namenode:8020 namenode:9870 datanode:9864 resourcemanager:8088
+      - PYSPARK_PYTHON=/opt/conda/bin/python
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/m.sh
+          bash /tmp/m.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
     volumes:
       - hadoop_historyserver:/hadoop/yarn/timeline
     env_file:
@@ -323,7 +328,9 @@ services:
       - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
       - INIT_DAEMON_STEP=setup_spark
       - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - HADOOP_HOME =/opt/hadoop
+      - HADOOP_HOME=/opt/hadoop
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=python3
     ports:
       - "8080:8080"
       - "7077:7077"

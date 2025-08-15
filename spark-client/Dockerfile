@@ -1,15 +1,22 @@
 FROM bitnami/spark:3.5.0
 USER root
-RUN apt-get update && apt-get install -y curl
-#RUN pip3 install py4j
-RUN mkdir -p /opt/hadoop/etc/hadoop
-ENV HADOOP_HOME=/opt/hadoop
-ENV HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
-ENV PATH=$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH
-COPY conf/ $HADOOP_CONF_DIR
-COPY apps/ /opt/spark-apps
-COPY drivers/*.jar /opt/bitnami/spark/jars/
 
-COPY dataset/* /opt/bitnami/spark/dataset/
-RUN pip3 install jupyterlab
-CMD jupyter-lab --allow-root --no-browser --ip=0.0.0.0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3-pip curl \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV HADOOP_HOME=/opt/hadoop \
+    HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop \
+    PATH=/opt/hadoop/bin:/opt/hadoop/sbin:$PATH
+
+RUN pip3 install --no-cache-dir \
+      jupyterlab \
+      ipykernel \
+      py4j==0.10.9.7
+
+RUN mkdir -p /workspace && chown -R 1001:0 /workspace
+
+USER 1001
+WORKDIR /workspace
+
+CMD ["jupyter-lab", "--ip=0.0.0.0", "--port=8888", "--no-browser"]
