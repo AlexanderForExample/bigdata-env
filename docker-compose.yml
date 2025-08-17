@@ -2,7 +2,7 @@ version: "3.8"
 services:
   x-airflow-common:
     &airflow-common
-    image: custom-airflow
+    build: ./airflow
     environment:
       &airflow-common-env
       AIRFLOW_HOME: /opt/airflow
@@ -69,7 +69,7 @@ services:
         condition: service_completed_successfully
   airflow-scheduler:
     <<: *airflow-common
-    image: custom-airflow
+    build: ./airflow
     container_name: scheduler
     command: scheduler
     healthcheck:
@@ -89,7 +89,7 @@ services:
 
   airflow-triggerer:
     <<: *airflow-common
-    image: custom-airflow
+    build: ./airflow
     container_name: triggerer
     command: triggerer
     healthcheck:
@@ -109,7 +109,7 @@ services:
 
   airflow-init:
     <<: *airflow-common
-    image: custom-airflow
+    build: ./airflow
     container_name: airflow-init
     entrypoint: /bin/bash
 
@@ -338,7 +338,7 @@ services:
       - "8888:8888"
     volumes:
       - ./spark-client/apps:/opt/spark-apps
-      - ./drivers:/opt/drivers
+#      - ./drivers:/opt/drivers
 
 volumes:
   postgres-data:

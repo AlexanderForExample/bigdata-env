@@ -38,12 +38,11 @@ RUN cd "/tmp" && \
     rm -rf "/tmp/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}"
 # Возвращаем пользователя airflow
 USER airflow
-
+RUN pip install pyspark==3.5.2
 # Устанавливаем необходимые пакеты, включая провайдер для Spark
 RUN pip install apache-airflow-providers-apache-spark==4.10.0
 RUN pip install apache-airflow-providers-yandex==3.12.0
 USER root
-RUN  mkdir -p /usr/local/spark/python/lib/ && \
-     cp /home/airflow/.local/lib/python3.12/site-packages/pyspark/python/lib/py4j-0.10.9.7-src.zip  /usr/local/spark/python/lib/ && \
-     cp $(python3 -c "import pyspark, os; print(os.path.join(os.path.dirname(pyspark.__file__), 'python', 'lib', 'pyspark.zip'))") /usr/local/spark/python/lib/pyspark.zip
-USER airflow
+#RUN  mkdir -p /usr/local/spark/python/lib/ && \
+#     cp /home/airflow/.local/lib/python3.12/site-packages/pyspark/python/lib/py4j-0.10.9.7-src.zip  /usr/local/spark/python/lib/ && \
+#     cp $(python3 -c "import pyspark, os; print(os.path.join(os.path.dirname(pyspark.__file__), 'python', 'lib', 'pyspark.zip'))") /usr/local/spark/python/lib/pyspark.zip
