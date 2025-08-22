@@ -5,9 +5,14 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends python3-pip curl \
  && rm -rf /var/lib/apt/lists/*
 
-ENV HADOOP_HOME=/opt/hadoop \
-    HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop \
-    PATH=/opt/hadoop/bin:/opt/hadoop/sbin:$PATH
+ENV SPARK_HOME=/opt/bitnami/spark \
+    SPARK_CONF_DIR=/opt/bitnami/spark/conf \
+    HADOOP_CONF_DIR=/opt/bitnami/spark/conf \
+    YARN_CONF_DIR=/opt/bitnami/spark/conf
+
+COPY conf/core-site.xml ${SPARK_CONF_DIR}/
+COPY conf/yarn-site.xml ${SPARK_CONF_DIR}/
+COPY conf/hive-site.xml ${SPARK_CONF_DIR}/
 
 RUN pip3 install --no-cache-dir \
       jupyterlab \

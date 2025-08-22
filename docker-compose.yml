@@ -338,7 +338,7 @@ services:
       - "8888:8888"
     volumes:
       - ./spark-client/apps:/opt/spark-apps
-#      - ./drivers:/opt/drivers
+      - jupyter-data:/workspace
 
 volumes:
   postgres-data:
@@ -348,3 +348,4 @@ volumes:
   hadoop_datanode:
   postgres_data:
   postgres-db-volume:
+  jupyter-data:
