@@ -14,13 +14,57 @@ N_ORDERS    = 120_000
 JSON_CHUNK  = 10_000
 BATCH_SIZE  = 50_000
 
-OUT_DIR = Path("/tmp/orders_json"); OUT_DIR.mkdir(parents=True, exist_ok=True)
+DATASET_DIR = Path(os.getenv("DATASET_DIR", Path(__file__).resolve().parent / "spark-client" / "dataset"))
+ORDERS_DIR  = DATASET_DIR / "orders_json"   # было /tmp/orders_json
+EVENTS_DIR  = DATASET_DIR / "hw_events"     # было /tmp/hw_events
+DATASET_DIR.mkdir(parents=True, exist_ok=True)
+ORDERS_DIR.mkdir(parents=True, exist_ok=True)
+EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+OUT_DIR = ORDERS_DIR
+
 CITIES  = ["Moscow"]*40 + ["SPb"]*25 + ["Kazan"]*10 + ["Novosibirsk"]*10 + ["Other"]*15
 CATS    = [f"Category_{i}" for i in range(100)]
 
 def gen_products():
     for pid in range(N_PRODUCTS):
         yield (pid, f"Product_{pid}", random.choice(CATS))
+
+def write_events_files(out_dir=EVENTS_DIR, n_events=500_000, files=10):
+    random.seed(42)
+    cities  = ["Moscow","SPb","Kazan","Novosibirsk","Other"]
+    devices = ["mobile","desktop","tablet"]
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    per_file = n_events // files
+
+    def gen_events(n):
+        base = datetime.utcnow().date() - timedelta(days=29)
+        for eid in range(1, n+1):
+            dt = base + timedelta(days=random.randint(0,29))
+            ts = datetime(dt.year, dt.month, dt.day,
+                          random.randint(0,23), random.randint(0,59), random.randint(0,59))
+            etype = random.choices(["view","cart","purchase"], weights=[65,20,15])[0]
+            user_id = random.randint(0, 50_000)
+            rec = {"event_id":eid,"ts":ts.isoformat()+"Z","user_id":user_id,
+                   "type":etype,"device":random.choice(devices)}
+            if random.random() < 0.6:
+                rec["geo"] = {"city": random.choice(cities)}
+            if etype in ("cart","purchase"):
+                items = [{"product_id": random.randint(0, 9_999),
+                          "qty": random.randint(1,3),
+                          "price": round(random.uniform(5.0, 150.0), 2)}
+                         for _ in range(random.randint(1,3))]
+                rec["items"] = items
+            yield rec
+
+    it = gen_events(n_events)
+    for i in range(files):
+        fname = Path(out_dir) / f"events_{i:03d}.json"
+        with fname.open("w", encoding="utf-8") as f:
+            to_write = per_file if i < files-1 else (n_events - per_file*(files-1))
+            for _ in range(to_write):
+                f.write(json.dumps(next(it), ensure_ascii=False) + "\n")
+    print(f"[events] wrote {n_events} records into {files} files at {out_dir}")
 
 def gen_users():
     for uid in range(N_USERS):
@@ -128,5 +172,8 @@ def load_postgres():
 
 if __name__ == "__main__":
     write_json_files()
+
+    write_events_files(n_events=500_000, files=10)
+
     load_postgres()
     print("Done.")

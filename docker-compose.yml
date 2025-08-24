@@ -339,7 +339,8 @@ services:
     volumes:
       - ./spark-client/apps:/opt/spark-apps
       - jupyter-data:/workspace
-      - ./spark-client/drivers:/opt/bitnami/spark/jars
+      - ./spark-client/drivers:/workspace/drivers
+      - ./spark-client/dataset:/workspace/dataset
 
 volumes:
   postgres-data:
