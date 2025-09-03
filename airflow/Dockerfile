@@ -1,4 +1,4 @@
-FROM apache/airflow:2.10.1
+FROM apache/airflow:2.10.1-python3.11
 
 # Переключаемся на пользователя root для выполнения команд с правами администратора
 USER root
@@ -19,7 +19,7 @@ RUN apt-get update \
 USER airflow
 
 # Устанавливаем Spark
-ENV SPARK_VERSION="3.5.2"
+ENV SPARK_VERSION="3.5.0"
 ENV HADOOP_VERSION="3"
 ENV SPARK_HOME=/usr/local/spark
 USER root
@@ -27,18 +27,15 @@ RUN mkdir -p /opt/hadoop/etc/hadoop
 ENV HADOOP_HOME=/opt/hadoop
 ENV HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
 COPY conf/ $HADOOP_CONF_DIR
-RUN cd "/tmp" && \
-    wget --no-verbose "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" && \
-    tar -xvzf "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" && \
-    mkdir -p "${SPARK_HOME}/bin" && \
-    mkdir -p "${SPARK_HOME}/assembly/target/scala-2.12/jars" && \
-    cp -a "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}/bin/." "${SPARK_HOME}/bin/" && \
-    cp -a "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}/jars/." "${SPARK_HOME}/assembly/target/scala-2.12/jars/" && \
-    rm "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" && \
-    rm -rf "/tmp/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}"
+RUN set -e; cd /tmp \
+ && wget --no-verbose "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
+ && tar -xzf "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" -C /opt \
+ && rm "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
+ && rm -rf "${SPARK_HOME}" \
+ && ln -s "/opt/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}" "${SPARK_HOME}"
 # Возвращаем пользователя airflow
 USER airflow
-RUN pip install pyspark==3.5.2
+#RUN pip install pyspark==3.5.0
 # Устанавливаем необходимые пакеты, включая провайдер для Spark
 RUN pip install apache-airflow-providers-apache-spark==4.10.0
 RUN pip install apache-airflow-providers-yandex==3.12.0
