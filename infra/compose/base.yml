@@ -1,0 +1,8 @@
+name: bigdata-env
+
+networks:
+  bigdata:
+    name: bigdata-env-net
+
+volumes:
+  postgres_data:

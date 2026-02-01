@@ -1,0 +1,23 @@
+services:
+  jupyter:
+    build:
+      context: ../images/jupyter
+      dockerfile: Dockerfile
+    container_name: bd-jupyter
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-course}
+    ports:
+      - "8888:8888"
+    volumes:
+      - ../..:/work:rw
+    networks:
+      - bigdata
+    command: >
+      start-notebook.py
+      --NotebookApp.token=${JUPYTER_TOKEN:-course}
+      --NotebookApp.password=''
+      --NotebookApp.allow_origin='*'
+      --NotebookApp.ip=0.0.0.0
+      --NotebookApp.port=8888
+      --NotebookApp.open_browser=False
