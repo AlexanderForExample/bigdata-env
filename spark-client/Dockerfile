@@ -19,7 +19,10 @@ RUN pip3 install --no-cache-dir \
       ipykernel \
       py4j==0.10.9.7
 
-RUN mkdir -p /workspace && chown -R 1001:0 /workspace
+RUN mkdir -p /opt/conda/bin /workspace \
+ && ln -sf "$(command -v python3)" /opt/conda/bin/python \
+ && ln -sf "$(command -v python3)" /opt/conda/bin/python3 \
+ && chown -R 1001:0 /opt/conda /workspace
 
 USER 1001
 WORKDIR /workspace

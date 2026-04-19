@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=infra/scripts/common.sh
+source "${SCRIPT_DIR}/common.sh"
+
 STACK="${1:-postgres}"
 
 echo "[reset] stack=${STACK}"
 
-case "$STACK" in
-  postgres)
-    docker compose --env-file infra/env/.env -f infra/compose/base.yml -f infra/compose/postgres.yml down -v --remove-orphans
-    echo "[reset] postgres volumes removed"
-    ;;
-  *)
-    echo "[reset] Unknown stack: $STACK" >&2
-    exit 1
-    ;;
-esac
+compose_cmd_for_stack "$STACK"
+"${COMPOSE_CMD[@]}" down -v --remove-orphans
+
+echo "[reset] stack volumes removed"

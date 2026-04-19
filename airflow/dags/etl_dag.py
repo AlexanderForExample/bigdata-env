@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
@@ -11,6 +12,7 @@ LOAD_JOB = f"{BASE_DIR}/spark/load_to_pg.py"
 SPARK_MASTER = "yarn"
 SPARK_DELPOY = "client"
 DRIVER_PATH = "hdfs:///drivers/postgresql-42.7.2.jar"
+DRIVER_PATH = os.getenv("PG_JDBC_DRIVER_HDFS_PATH", DRIVER_PATH)
 
 default_args = {
     "owner": "Alexander",

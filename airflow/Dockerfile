@@ -3,8 +3,8 @@ FROM apache/airflow:2.10.1-python3.11
 # Переключаемся на пользователя root для выполнения команд с правами администратора
 USER root
 
-# Установка пакета procps, который содержит ps, и wget
-RUN apt-get update && apt-get install -y procps wget
+# Установка базовых утилит для healthcheck и spark-submit
+RUN apt-get update && apt-get install -y procps wget curl
 
 # Установка Java (OpenJDK 17)
 RUN apt-get update \
@@ -22,6 +22,7 @@ USER airflow
 ENV SPARK_VERSION="3.5.0"
 ENV HADOOP_VERSION="3"
 ENV SPARK_HOME=/usr/local/spark
+ENV PATH="${SPARK_HOME}/bin:${PATH}"
 USER root
 RUN mkdir -p /opt/hadoop/etc/hadoop
 ENV HADOOP_HOME=/opt/hadoop
@@ -33,6 +34,9 @@ RUN set -e; cd /tmp \
  && rm "spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
  && rm -rf "${SPARK_HOME}" \
  && ln -s "/opt/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}" "${SPARK_HOME}"
+RUN mkdir -p /opt/conda/bin \
+ && ln -sf "$(command -v python)" /opt/conda/bin/python \
+ && ln -sf "$(command -v python)" /opt/conda/bin/python3
 # Возвращаем пользователя airflow
 USER airflow
 #RUN pip install pyspark==3.5.0
