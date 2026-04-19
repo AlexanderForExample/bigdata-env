@@ -1,0 +1,131 @@
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: bd-namenode
+    ports:
+      - "${NAMENODE_HTTP_PORT:-9870}:9870"
+      - "${NAMENODE_RPC_PORT:-8020}:8020"
+    environment:
+      CLUSTER_NAME: ${HADOOP_CLUSTER_NAME:-bigdata-env}
+      HDFS_CONF_dfs_namenode_name_dir: file:///hadoop/dfs/name
+      PYSPARK_PYTHON: /opt/conda/bin/python
+      ENSURE_NAMENODE_DIR: "true"
+    entrypoint: &hadoop-python-entrypoint
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        if [ ! -x /opt/conda/bin/python ]; then
+          echo "Installing Miniconda..."
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh -o /tmp/miniconda.sh
+          bash /tmp/miniconda.sh -b -p /opt/conda
+        fi
+        exec /entrypoint.sh /run.sh
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    env_file:
+      - ../../hive-metastore/conf/hadoop.env
+    networks:
+      - bigdata
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: bd-datanode
+    environment:
+      SERVICE_PRECONDITION: namenode:9870
+      PYSPARK_PYTHON: /opt/conda/bin/python
+    entrypoint: *hadoop-python-entrypoint
+    depends_on:
+      - namenode
+    ports:
+      - "${DATANODE_HTTP_PORT:-9864}:9864"
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    env_file:
+      - ../../hive-metastore/conf/hadoop.env
+    networks:
+      - bigdata
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: bd-resourcemanager
+    environment:
+      SERVICE_PRECONDITION: namenode:8020 datanode:9864
+      PYSPARK_PYTHON: /opt/conda/bin/python
+    entrypoint: *hadoop-python-entrypoint
+    depends_on:
+      - namenode
+      - datanode
+    ports:
+      - "${RESOURCEMANAGER_PORT:-8088}:8088"
+    env_file:
+      - ../../hive-metastore/conf/hadoop.env
+    networks:
+      - bigdata
+
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: bd-nodemanager
+    environment:
+      SERVICE_PRECONDITION: namenode:8020 datanode:9864 resourcemanager:8088
+      PYSPARK_PYTHON: /opt/conda/bin/python
+    entrypoint: *hadoop-python-entrypoint
+    depends_on:
+      - namenode
+      - datanode
+      - resourcemanager
+    ports:
+      - "${NODEMANAGER_PORT:-8042}:8042"
+    env_file:
+      - ../../hive-metastore/conf/hadoop.env
+    networks:
+      - bigdata
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: bd-historyserver
+    environment:
+      SERVICE_PRECONDITION: namenode:8020 namenode:9870 datanode:9864 resourcemanager:8088
+      PYSPARK_PYTHON: /opt/conda/bin/python
+    entrypoint: *hadoop-python-entrypoint
+    depends_on:
+      - namenode
+      - datanode
+      - resourcemanager
+    ports:
+      - "${HISTORYSERVER_PORT:-8188}:8188"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ../../hive-metastore/conf/hadoop.env
+    networks:
+      - bigdata
+
+  spark-client:
+    build:
+      context: ../../spark-client
+      dockerfile: Dockerfile
+    image: bd-spark-client:3.5.0
+    container_name: bd-spark-client
+    environment:
+      HADOOP_CONF_DIR: /opt/bitnami/spark/conf
+      SPARK_CONF_DIR: /opt/bitnami/spark/conf
+      YARN_CONF_DIR: /opt/bitnami/spark/conf
+      PYSPARK_PYTHON: /opt/conda/bin/python
+      PYSPARK_DRIVER_PYTHON: /opt/conda/bin/python
+    depends_on:
+      - namenode
+      - datanode
+      - resourcemanager
+      - nodemanager
+      - historyserver
+    ports:
+      - "${SPARK_NOTEBOOK_PORT:-8889}:8888"
+      - "${SPARK_UI_PORT:-4040}:4040"
+    volumes:
+      - spark_workspace:/workspace
+      - ../../spark-client/dataset:/workspace/dataset
+      - ../../spark-client/drivers:/workspace/drivers
+      - ../..:/workspace/project
+    networks:
+      - bigdata

@@ -1,0 +1,42 @@
+services:
+  hive-metastore-postgresql:
+    image: bde2020/hive-metastore-postgresql:2.3.0
+    container_name: bd-hive-metastore-postgresql
+    volumes:
+      - hive_metastore_db_data:/var/lib/postgresql/data
+    networks:
+      - bigdata
+
+  hive-metastore:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: bd-hive-metastore
+    env_file:
+      - ../../hive-metastore/conf/hadoop-hive.env
+    command: /opt/hive/bin/hive --service metastore
+    environment:
+      SERVICE_PRECONDITION: namenode:8020 datanode:9864 hive-metastore-postgresql:5432
+    depends_on:
+      - namenode
+      - datanode
+      - hive-metastore-postgresql
+    ports:
+      - "${HIVE_METASTORE_PORT:-9083}:9083"
+    networks:
+      - bigdata
+
+  hive-server:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: bd-hive-server
+    env_file:
+      - ../../hive-metastore/conf/hadoop-hive.env
+    environment:
+      HIVE_CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      SERVICE_PRECONDITION: namenode:8020 datanode:9864 hive-metastore:9083
+    depends_on:
+      - namenode
+      - datanode
+      - hive-metastore
+    ports:
+      - "${HIVE_SERVER_PORT:-10000}:10000"
+    networks:
+      - bigdata

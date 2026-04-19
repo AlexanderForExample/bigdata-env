@@ -1,0 +1,15 @@
+name: bigdata-env
+
+networks:
+  bigdata:
+    name: bigdata-env-net
+
+volumes:
+  postgres_data:
+  airflow_db_data:
+  postgres_tgt_data:
+  hive_metastore_db_data:
+  hadoop_namenode:
+  hadoop_datanode:
+  hadoop_historyserver:
+  spark_workspace:
